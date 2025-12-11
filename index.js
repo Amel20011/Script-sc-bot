@@ -90,7 +90,7 @@ async function connectToWhatsApp() {
             console.log('\nBot siap menerima pesanan...\n');
             
             // Update status
-            await sock.sendPresenceUpdate('available');
+            sock.sendPresenceUpdate('available');
         } else if (connection === 'connecting') {
             console.log('🔄 Menghubungkan ke WhatsApp...');
         }
