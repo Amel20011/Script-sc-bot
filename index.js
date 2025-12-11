@@ -4,51 +4,51 @@ const fs = require('fs');
 const handler = require('./handler');
 const config = require('./config');
 
-// Fungsi untuk koneksi WhatsApp
 async function connectToWhatsApp() {
     console.log(''+' Modified Bailleys '+'');
     console.log('Hi, thank you for using my modified Bailleys ^_^ Telegram: @yumevtc');
     console.log('Latest update: 12/8/2025\n');
 
-    // Membuat folder untuk auth state
     const authFolder = './auth_info';
     if (!fs.existsSync(authFolder)) {
         fs.mkdirSync(authFolder);
     }
 
-    // Load auth state
     const { state, saveCreds } = await useMultiFileAuthState(authFolder);
-    
-    // Fetch latest version
     const { version } = await fetchLatestBaileysVersion();
     
-    // Membuat socket WhatsApp
+    // FIX: Buat custom logger yang sederhana
+    const customLogger = {
+        level: 'silent',
+        trace: () => {},
+        debug: () => {},
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+        fatal: () => {}
+    };
+    
     const sock = makeWASocket({
         version,
-        logger: { level: 'silent' },
+        logger: customLogger, // FIX: Gunakan custom logger
         printQRInTerminal: true,
-        mobile: false, // false untuk bot
+        mobile: false,
         auth: {
             creds: state.creds,
             keys: makeCacheableSignalKeyStore(state.keys, { log: console.log }),
         },
-        // Browser configuration untuk versi kiuur (tidak pakai Browsers.macOS)
-        browser: ["Ubuntu", "Chrome", "110.0.5481.100"], // Format: [OS, Browser, Version]
+        browser: ["Ubuntu", "Chrome", "110.0.5481.100"],
         generateHighQualityLinkPreview: true,
         markOnlineOnConnect: false,
         syncFullHistory: false,
         fireInitQueries: true,
         emitOwnEvents: true,
         defaultQueryTimeoutMs: 60000,
-        // Handle pesan
         getMessage: async (key) => {
-            return {
-                conversation: "hello"
-            };
+            return { conversation: "hello" };
         }
     });
 
-    // Event handler untuk koneksi
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
         
@@ -61,7 +61,6 @@ async function connectToWhatsApp() {
             console.log('3. Pilih "Pair using code"');
             console.log('4. Masukkan kode pairing yang muncul di terminal\n');
             
-            // Juga tampilkan pairing code jika tersedia
             if (update.pairingCode) {
                 console.log(`📟 Pairing Code: ${update.pairingCode}`);
             }
@@ -76,7 +75,6 @@ async function connectToWhatsApp() {
                 setTimeout(connectToWhatsApp, 5000);
             } else {
                 console.log('Tidak bisa reconnect, mungkin sesi sudah tidak valid.');
-                // Hapus auth folder untuk memulai baru
                 if (fs.existsSync(authFolder)) {
                     fs.rmSync(authFolder, { recursive: true, force: true });
                     console.log('Auth info dihapus. Silakan restart bot untuk scan QR baru.');
@@ -89,32 +87,24 @@ async function connectToWhatsApp() {
             console.log(`📞 Connected as: ${sock.user?.id || 'Unknown'}`);
             console.log('\nBot siap menerima pesanan...\n');
             
-            // Update status
             sock.sendPresenceUpdate('available');
         } else if (connection === 'connecting') {
             console.log('🔄 Menghubungkan ke WhatsApp...');
         }
     });
 
-    // Save credentials when updated
     sock.ev.on('creds.update', saveCreds);
 
-    // Event handler untuk pesan
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
         if (type !== 'notify') return;
 
         const message = messages[0];
-        
-        // Skip jika pesan dari bot sendiri atau bukan pesan biasa
         if (message.key.fromMe || !message.message) return;
         
-        // Debug log
         console.log(`📩 Pesan dari: ${message.key.remoteJid}`);
         
-        // Hanya handle pesan dari pengguna (bukan broadcast, status, dll)
         if (message.key.remoteJid.endsWith('@s.whatsapp.net')) {
             try {
-                // Cek tipe pesan
                 let text = '';
                 if (message.message.conversation) {
                     text = message.message.conversation;
@@ -127,13 +117,9 @@ async function connectToWhatsApp() {
                 }
                 
                 console.log(`📝 Isi: ${text || '[non-text message]'}`);
-                
-                // Handle pesan
                 await handler.handleMessage(sock, message);
             } catch (error) {
                 console.error('❌ Error handling message:', error.message || error);
-                
-                // Kirim error message ke user
                 try {
                     await sock.sendMessage(message.key.remoteJid, { 
                         text: '❌ Terjadi kesalahan sistem. Silakan coba lagi atau hubungi admin.' 
@@ -145,40 +131,9 @@ async function connectToWhatsApp() {
         }
     });
 
-    // Event handler untuk pesan group (opsional)
-    sock.ev.on('group-participants.update', async (update) => {
-        console.log('Group update:', update);
-    });
-
-    // Event handler untuk chat update
-    sock.ev.on('chats.update', (updates) => {
-        // Handle chat updates
-    });
-
-    // Event handler untuk presence update
-    sock.ev.on('presence.update', (update) => {
-        // Handle presence update
-    });
-
-    // Event handler untuk contacts update
-    sock.ev.on('contacts.update', (updates) => {
-        // Handle contacts update
-    });
-
-    // Clean up saat proses berhenti
-    process.on('beforeExit', async () => {
-        console.log('🛑 Menutup koneksi WhatsApp...');
-        try {
-            await sock.end();
-        } catch (e) {
-            console.error('Error closing connection:', e);
-        }
-    });
-
     return sock;
 }
 
-// Fungsi untuk memulai bot
 async function startBot() {
     console.log('🚀 Starting WhatsApp Store Bot...');
     console.log('===============================\n');
@@ -192,26 +147,17 @@ async function startBot() {
     }
 }
 
-// Handle process termination
 process.on('SIGINT', () => {
-    console.log('\n\n🛑 Bot dihentikan oleh user (SIGINT)');
-    process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-    console.log('\n\n🛑 Bot dihentikan (SIGTERM)');
+    console.log('\n\n🛑 Bot dihentikan oleh user');
     process.exit(0);
 });
 
 process.on('uncaughtException', (error) => {
     console.error('❌ Uncaught Exception:', error);
-    console.log('🔄 Restarting bot...');
-    setTimeout(startBot, 5000);
 });
 
 process.on('unhandledRejection', (error) => {
     console.error('❌ Unhandled Rejection:', error);
 });
 
-// Jalankan bot
 startBot();
