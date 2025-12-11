@@ -49,7 +49,7 @@ async function connectToWhatsApp() {
     });
 
     // Event handler untuk koneksi
-    sock.ev.on('connection.update', (update) => {
+    sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
         
         if (qr) {
